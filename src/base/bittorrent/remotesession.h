@@ -26,6 +26,7 @@
 #include "cachestatus.h"
 #include "session.h"
 #include "sessionstatus.h"
+#include "trackerentry.h"
 
 class QTimer;
 namespace Net { class ApiClient; class PortForwarder; }
@@ -64,6 +65,8 @@ namespace BitTorrent
         void emitTorrentMetadataReceived(Torrent *torrent);
         // Called by RemoteTorrent after its file list is refreshed, so the UI re-reads file priorities/progress.
         void emitTorrentsUpdated(Torrent *torrent);
+        // Called by RemoteTorrent after its tracker list is fetched, so the sidebar filter populates.
+        void emitTrackersAdded(Torrent *torrent, const QList<TrackerEntry> &trackers);
 
         // ----- Paths -----
         Path savePath() const override;

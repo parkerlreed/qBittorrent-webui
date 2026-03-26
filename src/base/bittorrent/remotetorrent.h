@@ -24,6 +24,7 @@
 
 #include "torrent.h"
 #include "torrentdata.h"
+#include "trackerentrystatus.h"
 
 namespace Net { class ApiClient; }
 
@@ -234,12 +235,18 @@ namespace BitTorrent
         bool m_fileListRefreshPending = false;
         QString m_magnetUri;
 
+        // Cached from /api/v2/torrents/trackers — fetched at construction and on tracker change.
+        QList<TrackerEntryStatus> m_trackerCache;
+        bool m_trackerCacheFetched = false;
+
         QString hashStr() const;
         void refreshFileList();
         void applyFileList(const QVariantList &files);
         // Fetches pieces_num/piece_size/pieces_have (and other fields missing from
         // v5.1.0 maindata) from /api/v2/torrents/properties, then triggers a UI refresh.
         void fetchPieceInfo();
+        void refreshTrackerList();
+        void applyTrackerList(const QVariantList &trackers);
 
         // Helpers for file list access
         QVariantMap fileEntry(int index) const;

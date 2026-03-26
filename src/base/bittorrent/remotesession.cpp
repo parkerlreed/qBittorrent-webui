@@ -144,6 +144,11 @@ namespace BitTorrent
         emit torrentsUpdated({torrent});
     }
 
+    void RemoteSession::emitTrackersAdded(Torrent *torrent, const QList<TrackerEntry> &trackers)
+    {
+        emit trackersAdded(torrent, trackers);
+    }
+
     QVariant RemoteSession::prefValue(const QString &key, const QVariant &defaultValue) const
     {
         return m_prefs.value(key, defaultValue);

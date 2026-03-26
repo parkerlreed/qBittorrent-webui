@@ -48,6 +48,9 @@ namespace BitTorrent
         , m_client(client)
         , m_data(data)
     {
+        // Always fetch the tracker list — needed for the sidebar filter regardless of metadata.
+        refreshTrackerList();
+
         if (m_data.hasMetadata)
         {
             refreshFileList();
@@ -64,6 +67,10 @@ namespace BitTorrent
 
         if (delta.contains(u"magnet_uri"_s))
             m_magnetUri = delta.value(u"magnet_uri"_s).toString();
+
+        // Re-fetch tracker list if the active tracker changed.
+        if (delta.contains(u"tracker"_s) && m_trackerCacheFetched)
+            refreshTrackerList();
 
         // Refresh file list when metadata first becomes available
         if (!hadMetadata && m_data.hasMetadata)
@@ -478,9 +485,7 @@ namespace BitTorrent
 
     QList<TrackerEntryStatus> RemoteTorrent::trackers() const
     {
-        // Cached trackers are not currently stored in TorrentData (they're not in maindata).
-        // Return empty; the GUI will fetch them lazily via the properties widget.
-        return {};
+        return m_trackerCache;
     }
 
     QList<QUrl> RemoteTorrent::urlSeeds() const
@@ -747,6 +752,50 @@ namespace BitTorrent
         m_fileList = files;
         // Notify the UI so TorrentContentModel re-reads file priorities/progress.
         static_cast<RemoteSession *>(m_session)->emitTorrentsUpdated(this);
+    }
+
+    void RemoteTorrent::refreshTrackerList()
+    {
+        m_client->torrentsTrackers(hashStr()).then(this,
+            [this](const QVariantList &trackers)
+            {
+                applyTrackerList(trackers);
+            });
+    }
+
+    void RemoteTorrent::applyTrackerList(const QVariantList &rawTrackers)
+    {
+        const bool firstFetch = !m_trackerCacheFetched;
+        m_trackerCacheFetched = true;
+
+        QList<TrackerEntryStatus> newCache;
+        QList<TrackerEntry> addedEntries;
+
+        for (const QVariant &v : rawTrackers)
+        {
+            const QVariantMap m = v.toMap();
+            const QString url = m.value(u"url"_s).toString();
+            // Skip synthetic entries like "** [DHT] **", "** [PeX] **", "** [LSD] **"
+            if (url.startsWith(u"** ["_s))
+                continue;
+
+            TrackerEntryStatus status;
+            status.url = url;
+            status.tier = m.value(u"tier"_s).toInt();
+            newCache.append(status);
+
+            // On first fetch, collect entries to emit trackersAdded for the sidebar.
+            if (firstFetch)
+                addedEntries.append(TrackerEntry{url, status.tier});
+        }
+
+        m_trackerCache = newCache;
+
+        auto *rs = static_cast<RemoteSession *>(m_session);
+        if (firstFetch && !addedEntries.isEmpty())
+            rs->emitTrackersAdded(this, addedEntries);
+        else if (!firstFetch)
+            rs->emitTorrentsUpdated(this);
     }
 
     void RemoteTorrent::fetchPieceInfo()
