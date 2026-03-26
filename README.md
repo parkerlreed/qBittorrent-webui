@@ -1,5 +1,29 @@
-qBittorrent - A BitTorrent client in Qt
+qBittorrent - A BitTorrent client in Qt (with Remote GUI support)
 ------------------------------------------
+
+> **This is a fork of qBittorrent adding remote GUI mode.**
+> The desktop UI can connect to a running `qbittorrent-nox` daemon over its
+> existing WebUI API — no code changes required on the server side.
+
+### Remote GUI Features
+
+- **File > Connect to Remote...** — connect the desktop UI to any
+  `qbittorrent-nox` instance on your network (or locally) by entering its
+  WebUI URL and credentials.
+- Full torrent list with live updates (status, progress, speeds, ETA, ratio,
+  seeds/peers) polled from `/api/v2/sync/maindata`.
+- All sidebar filters work: status, category, tags, and tracker hostname.
+- Torrent actions work: start, stop, delete, recheck, reannounce, set
+  category/tags, rename, change save path, set speed limits, etc.
+- Properties panel: general info, piece map (backfilled from
+  `/api/v2/torrents/properties` for servers older than v5.2.0), trackers,
+  peers, HTTP sources, and file content with priority controls.
+- File priority changes sync bidirectionally between the desktop and the
+  remote WebUI.
+- Options dialog reads and writes remote server preferences (Downloads,
+  Connection, Speed, BitTorrent, WebUI, Behavior/Logs tabs).
+
+---
 
 [![GitHub Actions CI Status](https://github.com/qbittorrent/qBittorrent/actions/workflows/ci_ubuntu.yaml/badge.svg)](https://github.com/qbittorrent/qBittorrent/actions)
 [![Coverity Status](https://scan.coverity.com/projects/5494/badge.svg)](https://scan.coverity.com/projects/5494)
