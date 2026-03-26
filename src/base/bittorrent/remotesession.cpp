@@ -20,6 +20,7 @@
 #include "remotesession.h"
 
 #include <chrono>
+#include <functional>
 
 #include <QHash>
 #include <QList>
@@ -31,6 +32,7 @@
 
 #include "base/global.h"
 #include "base/net/apiclient.h"
+#include "base/net/portforwarder.h"
 #include "base/path.h"
 #include "base/tag.h"
 #include "base/utils/string.h"
@@ -42,6 +44,43 @@
 #include "torrentcontentlayout.h"
 #include "torrentcontentremoveoption.h"
 #include "torrentdescriptor.h"
+
+namespace
+{
+    // Minimal PortForwarder that delegates isEnabled/setEnabled to a RemoteSession's
+    // cached preferences.  setPorts/removePorts are intentional no-ops — the remote
+    // server handles actual UPnP mapping.
+    class RemotePortForwarder final : public Net::PortForwarder
+    {
+    public:
+        explicit RemotePortForwarder(QObject *parent = nullptr)
+            : Net::PortForwarder(parent) {}
+
+        bool isEnabled() const override { return m_enabled; }
+
+        void setEnabled(bool enabled) override
+        {
+            if (m_enabled == enabled)
+                return;
+            m_enabled = enabled;
+            if (m_onSet)
+                m_onSet(enabled);
+        }
+
+        void setPorts(const QString &, QSet<quint16>) override {}
+        void removePorts(const QString &) override {}
+
+        void init(bool enabled, std::function<void(bool)> onSet)
+        {
+            m_enabled = enabled;
+            m_onSet = std::move(onSet);
+        }
+
+    private:
+        bool m_enabled = false;
+        std::function<void(bool)> m_onSet;
+    };
+}
 
 namespace BitTorrent
 {
@@ -70,6 +109,7 @@ namespace BitTorrent
         : Session()
         , m_client(new Net::ApiClient(baseUrl, this))
         , m_pollTimer(new QTimer(this))
+        , m_portForwarder(new RemotePortForwarder(this))
     {
         Q_UNUSED(username)
         Q_UNUSED(password)
@@ -104,6 +144,16 @@ namespace BitTorrent
         emit torrentsUpdated({torrent});
     }
 
+    QVariant RemoteSession::prefValue(const QString &key, const QVariant &defaultValue) const
+    {
+        return m_prefs.value(key, defaultValue);
+    }
+
+    void RemoteSession::setPrefValue(const QString &key, const QVariant &value)
+    {
+        setPref(key, value);
+    }
+
     // ----- private slots -----
 
     void RemoteSession::onLoggedIn()
@@ -118,6 +168,12 @@ namespace BitTorrent
     void RemoteSession::onPreferencesFetched(const QVariantMap &prefs)
     {
         m_prefs = prefs;
+
+        // Wire up RemotePortForwarder now that we have cached preferences.
+        static_cast<RemotePortForwarder *>(m_portForwarder)->init(
+            m_prefs.value(u"upnp"_s, false).toBool(),
+            [this](bool enabled) { setPref(u"upnp"_s, enabled); });
+
         m_restored = true;
         emit restored();
         m_pollTimer->start();

@@ -47,6 +47,7 @@
 #include <QSystemTrayIcon>
 #include <QTranslator>
 
+#include "base/bittorrent/remotesession.h"
 #include "base/bittorrent/session.h"
 #include "base/bittorrent/sharelimits.h"
 #include "base/exceptions.h"
@@ -360,19 +361,37 @@ void OptionsDialog::loadBehaviorTabOptions()
 
     m_ui->textFileLogPath->setDialogCaption(tr("Choose a save directory"));
     m_ui->textFileLogPath->setMode(FileSystemPathEdit::Mode::DirectorySave);
-    m_ui->textFileLogPath->setSelectedPath(app()->fileLoggerPath());
-    const bool fileLogBackup = app()->isFileLoggerBackup();
-    m_ui->checkFileLogBackup->setChecked(fileLogBackup);
-    m_ui->spinFileLogSize->setEnabled(fileLogBackup);
-    const bool fileLogDelete = app()->isFileLoggerDeleteOld();
-    m_ui->checkFileLogDelete->setChecked(fileLogDelete);
-    m_ui->spinFileLogAge->setEnabled(fileLogDelete);
-    m_ui->comboFileLogAgeType->setEnabled(fileLogDelete);
-    m_ui->spinFileLogSize->setValue(app()->fileLoggerMaxSize() / 1024);
-    m_ui->spinFileLogAge->setValue(app()->fileLoggerAge());
-    m_ui->comboFileLogAgeType->setCurrentIndex(app()->fileLoggerAgeType());
-    // Groupbox's check state  must be initialized after some of its children if they are manually enabled/disabled
-    m_ui->checkFileLog->setChecked(app()->isFileLoggerEnabled());
+    if (auto *rs = qobject_cast<BitTorrent::RemoteSession *>(BitTorrent::Session::instance()))
+    {
+        m_ui->textFileLogPath->setSelectedPath(Path(rs->prefValue(u"file_log_path"_s).toString()));
+        const bool fileLogBackup = rs->prefValue(u"file_log_backup_enabled"_s).toBool();
+        m_ui->checkFileLogBackup->setChecked(fileLogBackup);
+        m_ui->spinFileLogSize->setEnabled(fileLogBackup);
+        const bool fileLogDelete = rs->prefValue(u"file_log_delete_old"_s).toBool();
+        m_ui->checkFileLogDelete->setChecked(fileLogDelete);
+        m_ui->spinFileLogAge->setEnabled(fileLogDelete);
+        m_ui->comboFileLogAgeType->setEnabled(fileLogDelete);
+        m_ui->spinFileLogSize->setValue(rs->prefValue(u"file_log_max_size"_s).toInt());
+        m_ui->spinFileLogAge->setValue(rs->prefValue(u"file_log_age"_s).toInt());
+        m_ui->comboFileLogAgeType->setCurrentIndex(rs->prefValue(u"file_log_age_type"_s).toInt());
+        m_ui->checkFileLog->setChecked(rs->prefValue(u"file_log_enabled"_s).toBool());
+    }
+    else
+    {
+        m_ui->textFileLogPath->setSelectedPath(app()->fileLoggerPath());
+        const bool fileLogBackup = app()->isFileLoggerBackup();
+        m_ui->checkFileLogBackup->setChecked(fileLogBackup);
+        m_ui->spinFileLogSize->setEnabled(fileLogBackup);
+        const bool fileLogDelete = app()->isFileLoggerDeleteOld();
+        m_ui->checkFileLogDelete->setChecked(fileLogDelete);
+        m_ui->spinFileLogAge->setEnabled(fileLogDelete);
+        m_ui->comboFileLogAgeType->setEnabled(fileLogDelete);
+        m_ui->spinFileLogSize->setValue(app()->fileLoggerMaxSize() / 1024);
+        m_ui->spinFileLogAge->setValue(app()->fileLoggerAge());
+        m_ui->comboFileLogAgeType->setCurrentIndex(app()->fileLoggerAgeType());
+        // Groupbox's check state must be initialized after some of its children if they are manually enabled/disabled
+        m_ui->checkFileLog->setChecked(app()->isFileLoggerEnabled());
+    }
 
     m_ui->checkBoxFreeDiskSpaceStatusBar->setChecked(pref->isStatusbarFreeDiskSpaceDisplayed());
     m_ui->checkBoxExternalIPStatusBar->setChecked(pref->isStatusbarExternalIPDisplayed());
@@ -552,13 +571,26 @@ void OptionsDialog::saveBehaviorTabOptions() const
     pref->setPreventFromSuspendWhenDownloading(m_ui->checkPreventFromSuspendWhenDownloading->isChecked());
     pref->setPreventFromSuspendWhenSeeding(m_ui->checkPreventFromSuspendWhenSeeding->isChecked());
 
-    app()->setFileLoggerPath(m_ui->textFileLogPath->selectedPath());
-    app()->setFileLoggerBackup(m_ui->checkFileLogBackup->isChecked());
-    app()->setFileLoggerMaxSize(m_ui->spinFileLogSize->value() * 1024);
-    app()->setFileLoggerAge(m_ui->spinFileLogAge->value());
-    app()->setFileLoggerAgeType(m_ui->comboFileLogAgeType->currentIndex());
-    app()->setFileLoggerDeleteOld(m_ui->checkFileLogDelete->isChecked());
-    app()->setFileLoggerEnabled(m_ui->checkFileLog->isChecked());
+    if (auto *rs = qobject_cast<BitTorrent::RemoteSession *>(BitTorrent::Session::instance()))
+    {
+        rs->setPrefValue(u"file_log_path"_s, m_ui->textFileLogPath->selectedPath().toString());
+        rs->setPrefValue(u"file_log_backup_enabled"_s, m_ui->checkFileLogBackup->isChecked());
+        rs->setPrefValue(u"file_log_max_size"_s, m_ui->spinFileLogSize->value());
+        rs->setPrefValue(u"file_log_age"_s, m_ui->spinFileLogAge->value());
+        rs->setPrefValue(u"file_log_age_type"_s, m_ui->comboFileLogAgeType->currentIndex());
+        rs->setPrefValue(u"file_log_delete_old"_s, m_ui->checkFileLogDelete->isChecked());
+        rs->setPrefValue(u"file_log_enabled"_s, m_ui->checkFileLog->isChecked());
+    }
+    else
+    {
+        app()->setFileLoggerPath(m_ui->textFileLogPath->selectedPath());
+        app()->setFileLoggerBackup(m_ui->checkFileLogBackup->isChecked());
+        app()->setFileLoggerMaxSize(m_ui->spinFileLogSize->value() * 1024);
+        app()->setFileLoggerAge(m_ui->spinFileLogAge->value());
+        app()->setFileLoggerAgeType(m_ui->comboFileLogAgeType->currentIndex());
+        app()->setFileLoggerDeleteOld(m_ui->checkFileLogDelete->isChecked());
+        app()->setFileLoggerEnabled(m_ui->checkFileLog->isChecked());
+    }
 
     app()->setStartUpWindowState(m_ui->windowStateComboBox->currentData().value<WindowState>());
 
@@ -1352,54 +1384,103 @@ void OptionsDialog::loadWebUITabOptions()
     m_ui->textWebUIRootFolder->setMode(FileSystemPathEdit::Mode::DirectoryOpen);
     m_ui->textWebUIRootFolder->setDialogCaption(tr("Choose Alternative UI files location"));
 
-    if (app()->webUI()->isErrored())
-        m_ui->labelWebUIError->setText(tr("WebUI configuration failed. Reason: %1").arg(app()->webUI()->errorMessage()));
-    else
+    if (auto *rs = qobject_cast<BitTorrent::RemoteSession *>(BitTorrent::Session::instance()))
+    {
         m_ui->labelWebUIError->hide();
-
-    m_ui->checkWebUI->setChecked(pref->isWebUIEnabled());
-    m_ui->textWebUIAddress->setText(pref->getWebUIAddress());
-    m_ui->spinWebUIPort->setValue(pref->getWebUIPort());
-    m_ui->checkWebUIUPnP->setChecked(pref->useUPnPForWebUIPort());
-    m_ui->checkWebUIHttps->setChecked(pref->isWebUIHttpsEnabled());
-    webUIHttpsCertChanged(pref->getWebUIHttpsCertificatePath());
-    webUIHttpsKeyChanged(pref->getWebUIHttpsKeyPath());
-    m_ui->textWebUIUsername->setText(pref->getWebUIUsername());
-
-    // API Key
-    if (const QString apiKey = pref->getWebUIApiKey(); Utils::APIKey::isValid(apiKey))
-        m_currentAPIKey = apiKey;
+        // WebUI is always enabled on the remote server
+        m_ui->checkWebUI->setChecked(true);
+        m_ui->textWebUIAddress->setText(rs->prefValue(u"web_ui_address"_s).toString());
+        m_ui->spinWebUIPort->setValue(rs->prefValue(u"web_ui_port"_s).toInt());
+        m_ui->checkWebUIUPnP->setChecked(rs->prefValue(u"web_ui_upnp"_s).toBool());
+        m_ui->checkWebUIHttps->setChecked(rs->prefValue(u"use_https"_s).toBool());
+        webUIHttpsCertChanged(Path(rs->prefValue(u"web_ui_https_cert_path"_s).toString()));
+        webUIHttpsKeyChanged(Path(rs->prefValue(u"web_ui_https_key_path"_s).toString()));
+        m_ui->textWebUIUsername->setText(rs->prefValue(u"web_ui_username"_s).toString());
+        // API Key
+        if (const QString apiKey = rs->prefValue(u"web_ui_api_key"_s).toString(); Utils::APIKey::isValid(apiKey))
+            m_currentAPIKey = apiKey;
+        else
+            m_currentAPIKey.clear();
+        setupWebUIAPIKey();
+        m_ui->checkBypassLocalAuth->setChecked(rs->prefValue(u"bypass_local_auth"_s).toBool());
+        m_ui->checkBypassAuthSubnetWhitelist->setChecked(rs->prefValue(u"bypass_auth_subnet_whitelist_enabled"_s).toBool());
+        m_ui->IPSubnetWhitelistButton->setEnabled(m_ui->checkBypassAuthSubnetWhitelist->isChecked());
+        m_ui->spinBanCounter->setValue(rs->prefValue(u"web_ui_max_auth_fail_count"_s).toInt());
+        m_ui->spinBanDuration->setValue(rs->prefValue(u"web_ui_ban_duration"_s).toInt());
+        m_ui->spinSessionTimeout->setValue(rs->prefValue(u"web_ui_session_timeout"_s).toInt());
+        // Alternative UI
+        m_ui->groupAltWebUI->setChecked(rs->prefValue(u"alternative_webui_enabled"_s).toBool());
+        m_ui->textWebUIRootFolder->setSelectedPath(Path(rs->prefValue(u"alternative_webui_path"_s).toString()));
+        // Security
+        m_ui->checkClickjacking->setChecked(rs->prefValue(u"web_ui_clickjacking_protection_enabled"_s).toBool());
+        m_ui->checkCSRFProtection->setChecked(rs->prefValue(u"web_ui_csrf_protection_enabled"_s).toBool());
+        m_ui->checkSecureCookie->setChecked(rs->prefValue(u"web_ui_secure_cookie_enabled"_s).toBool());
+        m_ui->groupHostHeaderValidation->setChecked(rs->prefValue(u"web_ui_host_header_validation_enabled"_s).toBool());
+        m_ui->textServerDomains->setText(rs->prefValue(u"web_ui_domain_list"_s).toString());
+        // Custom HTTP headers
+        m_ui->groupWebUIAddCustomHTTPHeaders->setChecked(rs->prefValue(u"web_ui_use_custom_http_headers_enabled"_s).toBool());
+        m_ui->textWebUICustomHTTPHeaders->setPlainText(rs->prefValue(u"web_ui_custom_http_headers"_s).toString());
+        // Reverse proxy
+        m_ui->groupEnableReverseProxySupport->setChecked(rs->prefValue(u"web_ui_reverse_proxy_enabled"_s).toBool());
+        m_ui->textTrustedReverseProxiesList->setText(rs->prefValue(u"web_ui_reverse_proxies_list"_s).toString());
+        // DynDNS
+        m_ui->checkDynDNS->setChecked(rs->prefValue(u"dyndns_enabled"_s).toBool());
+        m_ui->comboDNSService->setCurrentIndex(rs->prefValue(u"dyndns_service"_s).toInt());
+        m_ui->domainNameTxt->setText(rs->prefValue(u"dyndns_domain"_s).toString());
+        m_ui->DNSUsernameTxt->setText(rs->prefValue(u"dyndns_username"_s).toString());
+        m_ui->DNSPasswordTxt->setText(rs->prefValue(u"dyndns_password"_s).toString());
+    }
     else
-        m_currentAPIKey.clear();
-    setupWebUIAPIKey();
+    {
+        if (app()->webUI()->isErrored())
+            m_ui->labelWebUIError->setText(tr("WebUI configuration failed. Reason: %1").arg(app()->webUI()->errorMessage()));
+        else
+            m_ui->labelWebUIError->hide();
 
-    m_ui->checkBypassLocalAuth->setChecked(!pref->isWebUILocalAuthEnabled());
-    m_ui->checkBypassAuthSubnetWhitelist->setChecked(pref->isWebUIAuthSubnetWhitelistEnabled());
-    m_ui->IPSubnetWhitelistButton->setEnabled(m_ui->checkBypassAuthSubnetWhitelist->isChecked());
-    m_ui->spinBanCounter->setValue(pref->getWebUIMaxAuthFailCount());
-    m_ui->spinBanDuration->setValue(pref->getWebUIBanDuration().count());
-    m_ui->spinSessionTimeout->setValue(pref->getWebUISessionTimeout());
-    // Alternative UI
-    m_ui->groupAltWebUI->setChecked(pref->isAltWebUIEnabled());
-    m_ui->textWebUIRootFolder->setSelectedPath(pref->getWebUIRootFolder());
-    // Security
-    m_ui->checkClickjacking->setChecked(pref->isWebUIClickjackingProtectionEnabled());
-    m_ui->checkCSRFProtection->setChecked(pref->isWebUICSRFProtectionEnabled());
-    m_ui->checkSecureCookie->setChecked(pref->isWebUISecureCookieEnabled());
-    m_ui->groupHostHeaderValidation->setChecked(pref->isWebUIHostHeaderValidationEnabled());
-    m_ui->textServerDomains->setText(pref->getServerDomains());
-    // Custom HTTP headers
-    m_ui->groupWebUIAddCustomHTTPHeaders->setChecked(pref->isWebUICustomHTTPHeadersEnabled());
-    m_ui->textWebUICustomHTTPHeaders->setPlainText(pref->getWebUICustomHTTPHeaders());
-    // Reverse proxy
-    m_ui->groupEnableReverseProxySupport->setChecked(pref->isWebUIReverseProxySupportEnabled());
-    m_ui->textTrustedReverseProxiesList->setText(pref->getWebUITrustedReverseProxiesList());
-    // DynDNS
-    m_ui->checkDynDNS->setChecked(pref->isDynDNSEnabled());
-    m_ui->comboDNSService->setCurrentIndex(static_cast<int>(pref->getDynDNSService()));
-    m_ui->domainNameTxt->setText(pref->getDynDomainName());
-    m_ui->DNSUsernameTxt->setText(pref->getDynDNSUsername());
-    m_ui->DNSPasswordTxt->setText(pref->getDynDNSPassword());
+        m_ui->checkWebUI->setChecked(pref->isWebUIEnabled());
+        m_ui->textWebUIAddress->setText(pref->getWebUIAddress());
+        m_ui->spinWebUIPort->setValue(pref->getWebUIPort());
+        m_ui->checkWebUIUPnP->setChecked(pref->useUPnPForWebUIPort());
+        m_ui->checkWebUIHttps->setChecked(pref->isWebUIHttpsEnabled());
+        webUIHttpsCertChanged(pref->getWebUIHttpsCertificatePath());
+        webUIHttpsKeyChanged(pref->getWebUIHttpsKeyPath());
+        m_ui->textWebUIUsername->setText(pref->getWebUIUsername());
+
+        // API Key
+        if (const QString apiKey = pref->getWebUIApiKey(); Utils::APIKey::isValid(apiKey))
+            m_currentAPIKey = apiKey;
+        else
+            m_currentAPIKey.clear();
+        setupWebUIAPIKey();
+
+        m_ui->checkBypassLocalAuth->setChecked(!pref->isWebUILocalAuthEnabled());
+        m_ui->checkBypassAuthSubnetWhitelist->setChecked(pref->isWebUIAuthSubnetWhitelistEnabled());
+        m_ui->IPSubnetWhitelistButton->setEnabled(m_ui->checkBypassAuthSubnetWhitelist->isChecked());
+        m_ui->spinBanCounter->setValue(pref->getWebUIMaxAuthFailCount());
+        m_ui->spinBanDuration->setValue(pref->getWebUIBanDuration().count());
+        m_ui->spinSessionTimeout->setValue(pref->getWebUISessionTimeout());
+        // Alternative UI
+        m_ui->groupAltWebUI->setChecked(pref->isAltWebUIEnabled());
+        m_ui->textWebUIRootFolder->setSelectedPath(pref->getWebUIRootFolder());
+        // Security
+        m_ui->checkClickjacking->setChecked(pref->isWebUIClickjackingProtectionEnabled());
+        m_ui->checkCSRFProtection->setChecked(pref->isWebUICSRFProtectionEnabled());
+        m_ui->checkSecureCookie->setChecked(pref->isWebUISecureCookieEnabled());
+        m_ui->groupHostHeaderValidation->setChecked(pref->isWebUIHostHeaderValidationEnabled());
+        m_ui->textServerDomains->setText(pref->getServerDomains());
+        // Custom HTTP headers
+        m_ui->groupWebUIAddCustomHTTPHeaders->setChecked(pref->isWebUICustomHTTPHeadersEnabled());
+        m_ui->textWebUICustomHTTPHeaders->setPlainText(pref->getWebUICustomHTTPHeaders());
+        // Reverse proxy
+        m_ui->groupEnableReverseProxySupport->setChecked(pref->isWebUIReverseProxySupportEnabled());
+        m_ui->textTrustedReverseProxiesList->setText(pref->getWebUITrustedReverseProxiesList());
+        // DynDNS
+        m_ui->checkDynDNS->setChecked(pref->isDynDNSEnabled());
+        m_ui->comboDNSService->setCurrentIndex(static_cast<int>(pref->getDynDNSService()));
+        m_ui->domainNameTxt->setText(pref->getDynDomainName());
+        m_ui->DNSUsernameTxt->setText(pref->getDynDNSUsername());
+        m_ui->DNSPasswordTxt->setText(pref->getDynDNSPassword());
+    }
 
     connect(m_ui->checkWebUI, &QGroupBox::toggled, this, &ThisType::enableApplyButton);
     connect(m_ui->textWebUIAddress, &QLineEdit::textChanged, this, &ThisType::enableApplyButton);
@@ -1450,46 +1531,89 @@ void OptionsDialog::saveWebUITabOptions() const
 {
     auto *pref = Preferences::instance();
 
-    const bool webUIEnabled = isWebUIEnabled();
+    if (auto *rs = qobject_cast<BitTorrent::RemoteSession *>(BitTorrent::Session::instance()))
+    {
+        rs->setPrefValue(u"web_ui_address"_s, m_ui->textWebUIAddress->text());
+        rs->setPrefValue(u"web_ui_port"_s, m_ui->spinWebUIPort->value());
+        rs->setPrefValue(u"web_ui_upnp"_s, m_ui->checkWebUIUPnP->isChecked());
+        rs->setPrefValue(u"use_https"_s, m_ui->checkWebUIHttps->isChecked());
+        rs->setPrefValue(u"web_ui_https_cert_path"_s, m_ui->textWebUIHttpsCert->selectedPath().toString());
+        rs->setPrefValue(u"web_ui_https_key_path"_s, m_ui->textWebUIHttpsKey->selectedPath().toString());
+        rs->setPrefValue(u"web_ui_max_auth_fail_count"_s, m_ui->spinBanCounter->value());
+        rs->setPrefValue(u"web_ui_ban_duration"_s, m_ui->spinBanDuration->value());
+        rs->setPrefValue(u"web_ui_session_timeout"_s, m_ui->spinSessionTimeout->value());
+        // Authentication
+        if (const QString username = webUIUsername(); isValidWebUIUsernameLength(username) && isValidWebUIUsernameCharacterSet(username))
+            rs->setPrefValue(u"web_ui_username"_s, username);
+        if (const QString password = webUIPassword(); isValidWebUIPasswordLength(password))
+            rs->setPrefValue(u"web_ui_password"_s, password);
+        rs->setPrefValue(u"bypass_local_auth"_s, m_ui->checkBypassLocalAuth->isChecked());
+        rs->setPrefValue(u"bypass_auth_subnet_whitelist_enabled"_s, m_ui->checkBypassAuthSubnetWhitelist->isChecked());
+        // Alternative UI
+        rs->setPrefValue(u"alternative_webui_enabled"_s, m_ui->groupAltWebUI->isChecked());
+        rs->setPrefValue(u"alternative_webui_path"_s, m_ui->textWebUIRootFolder->selectedPath().toString());
+        // Security
+        rs->setPrefValue(u"web_ui_clickjacking_protection_enabled"_s, m_ui->checkClickjacking->isChecked());
+        rs->setPrefValue(u"web_ui_csrf_protection_enabled"_s, m_ui->checkCSRFProtection->isChecked());
+        rs->setPrefValue(u"web_ui_secure_cookie_enabled"_s, m_ui->checkSecureCookie->isChecked());
+        rs->setPrefValue(u"web_ui_host_header_validation_enabled"_s, m_ui->groupHostHeaderValidation->isChecked());
+        rs->setPrefValue(u"web_ui_domain_list"_s, m_ui->textServerDomains->text());
+        // Custom HTTP headers
+        rs->setPrefValue(u"web_ui_use_custom_http_headers_enabled"_s, m_ui->groupWebUIAddCustomHTTPHeaders->isChecked());
+        rs->setPrefValue(u"web_ui_custom_http_headers"_s, m_ui->textWebUICustomHTTPHeaders->toPlainText());
+        // Reverse proxy
+        rs->setPrefValue(u"web_ui_reverse_proxy_enabled"_s, m_ui->groupEnableReverseProxySupport->isChecked());
+        rs->setPrefValue(u"web_ui_reverse_proxies_list"_s, m_ui->textTrustedReverseProxiesList->text());
+        // DynDNS
+        rs->setPrefValue(u"dyndns_enabled"_s, m_ui->checkDynDNS->isChecked());
+        rs->setPrefValue(u"dyndns_service"_s, m_ui->comboDNSService->currentIndex());
+        rs->setPrefValue(u"dyndns_domain"_s, m_ui->domainNameTxt->text());
+        rs->setPrefValue(u"dyndns_username"_s, m_ui->DNSUsernameTxt->text());
+        rs->setPrefValue(u"dyndns_password"_s, m_ui->DNSPasswordTxt->text());
+    }
+    else
+    {
+        const bool webUIEnabled = isWebUIEnabled();
 
-    pref->setWebUIEnabled(webUIEnabled);
-    pref->setWebUIAddress(m_ui->textWebUIAddress->text());
-    pref->setWebUIPort(m_ui->spinWebUIPort->value());
-    pref->setUPnPForWebUIPort(m_ui->checkWebUIUPnP->isChecked());
-    pref->setWebUIHttpsEnabled(m_ui->checkWebUIHttps->isChecked());
-    pref->setWebUIHttpsCertificatePath(m_ui->textWebUIHttpsCert->selectedPath());
-    pref->setWebUIHttpsKeyPath(m_ui->textWebUIHttpsKey->selectedPath());
-    pref->setWebUIMaxAuthFailCount(m_ui->spinBanCounter->value());
-    pref->setWebUIBanDuration(std::chrono::seconds {m_ui->spinBanDuration->value()});
-    pref->setWebUISessionTimeout(m_ui->spinSessionTimeout->value());
-    // Authentication
-    if (const QString username = webUIUsername(); isValidWebUIUsernameLength(username) && isValidWebUIUsernameCharacterSet(username))
-        pref->setWebUIUsername(username);
-    if (const QString password = webUIPassword(); isValidWebUIPasswordLength(password))
-        pref->setWebUIPassword(Utils::Password::PBKDF2::generate(password));
-    pref->setWebUILocalAuthEnabled(!m_ui->checkBypassLocalAuth->isChecked());
-    pref->setWebUIAuthSubnetWhitelistEnabled(m_ui->checkBypassAuthSubnetWhitelist->isChecked());
-    // Alternative UI
-    pref->setAltWebUIEnabled(m_ui->groupAltWebUI->isChecked());
-    pref->setWebUIRootFolder(m_ui->textWebUIRootFolder->selectedPath());
-    // Security
-    pref->setWebUIClickjackingProtectionEnabled(m_ui->checkClickjacking->isChecked());
-    pref->setWebUICSRFProtectionEnabled(m_ui->checkCSRFProtection->isChecked());
-    pref->setWebUISecureCookieEnabled(m_ui->checkSecureCookie->isChecked());
-    pref->setWebUIHostHeaderValidationEnabled(m_ui->groupHostHeaderValidation->isChecked());
-    pref->setServerDomains(m_ui->textServerDomains->text());
-    // Custom HTTP headers
-    pref->setWebUICustomHTTPHeadersEnabled(m_ui->groupWebUIAddCustomHTTPHeaders->isChecked());
-    pref->setWebUICustomHTTPHeaders(m_ui->textWebUICustomHTTPHeaders->toPlainText());
-    // Reverse proxy
-    pref->setWebUIReverseProxySupportEnabled(m_ui->groupEnableReverseProxySupport->isChecked());
-    pref->setWebUITrustedReverseProxiesList(m_ui->textTrustedReverseProxiesList->text());
-    // DynDNS
-    pref->setDynDNSEnabled(m_ui->checkDynDNS->isChecked());
-    pref->setDynDNSService(static_cast<DNS::Service>(m_ui->comboDNSService->currentIndex()));
-    pref->setDynDomainName(m_ui->domainNameTxt->text());
-    pref->setDynDNSUsername(m_ui->DNSUsernameTxt->text());
-    pref->setDynDNSPassword(m_ui->DNSPasswordTxt->text());
+        pref->setWebUIEnabled(webUIEnabled);
+        pref->setWebUIAddress(m_ui->textWebUIAddress->text());
+        pref->setWebUIPort(m_ui->spinWebUIPort->value());
+        pref->setUPnPForWebUIPort(m_ui->checkWebUIUPnP->isChecked());
+        pref->setWebUIHttpsEnabled(m_ui->checkWebUIHttps->isChecked());
+        pref->setWebUIHttpsCertificatePath(m_ui->textWebUIHttpsCert->selectedPath());
+        pref->setWebUIHttpsKeyPath(m_ui->textWebUIHttpsKey->selectedPath());
+        pref->setWebUIMaxAuthFailCount(m_ui->spinBanCounter->value());
+        pref->setWebUIBanDuration(std::chrono::seconds {m_ui->spinBanDuration->value()});
+        pref->setWebUISessionTimeout(m_ui->spinSessionTimeout->value());
+        // Authentication
+        if (const QString username = webUIUsername(); isValidWebUIUsernameLength(username) && isValidWebUIUsernameCharacterSet(username))
+            pref->setWebUIUsername(username);
+        if (const QString password = webUIPassword(); isValidWebUIPasswordLength(password))
+            pref->setWebUIPassword(Utils::Password::PBKDF2::generate(password));
+        pref->setWebUILocalAuthEnabled(!m_ui->checkBypassLocalAuth->isChecked());
+        pref->setWebUIAuthSubnetWhitelistEnabled(m_ui->checkBypassAuthSubnetWhitelist->isChecked());
+        // Alternative UI
+        pref->setAltWebUIEnabled(m_ui->groupAltWebUI->isChecked());
+        pref->setWebUIRootFolder(m_ui->textWebUIRootFolder->selectedPath());
+        // Security
+        pref->setWebUIClickjackingProtectionEnabled(m_ui->checkClickjacking->isChecked());
+        pref->setWebUICSRFProtectionEnabled(m_ui->checkCSRFProtection->isChecked());
+        pref->setWebUISecureCookieEnabled(m_ui->checkSecureCookie->isChecked());
+        pref->setWebUIHostHeaderValidationEnabled(m_ui->groupHostHeaderValidation->isChecked());
+        pref->setServerDomains(m_ui->textServerDomains->text());
+        // Custom HTTP headers
+        pref->setWebUICustomHTTPHeadersEnabled(m_ui->groupWebUIAddCustomHTTPHeaders->isChecked());
+        pref->setWebUICustomHTTPHeaders(m_ui->textWebUICustomHTTPHeaders->toPlainText());
+        // Reverse proxy
+        pref->setWebUIReverseProxySupportEnabled(m_ui->groupEnableReverseProxySupport->isChecked());
+        pref->setWebUITrustedReverseProxiesList(m_ui->textTrustedReverseProxiesList->text());
+        // DynDNS
+        pref->setDynDNSEnabled(m_ui->checkDynDNS->isChecked());
+        pref->setDynDNSService(static_cast<DNS::Service>(m_ui->comboDNSService->currentIndex()));
+        pref->setDynDomainName(m_ui->domainNameTxt->text());
+        pref->setDynDNSUsername(m_ui->DNSUsernameTxt->text());
+        pref->setDynDNSPassword(m_ui->DNSPasswordTxt->text());
+    }
 }
 
 void OptionsDialog::onBtnWebUIAPIKeyCopyClicked()

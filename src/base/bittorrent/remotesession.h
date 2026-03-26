@@ -28,7 +28,7 @@
 #include "sessionstatus.h"
 
 class QTimer;
-namespace Net { class ApiClient; }
+namespace Net { class ApiClient; class PortForwarder; }
 
 namespace BitTorrent
 {
@@ -53,6 +53,12 @@ namespace BitTorrent
         ~RemoteSession() override;
 
         Net::ApiClient *apiClient() const;
+
+        // Read/write a raw preference value from the cached prefs map.
+        // Used by the Options dialog to access app-level settings (e.g. file logger)
+        // that live in /api/v2/app/preferences but not in the Session interface.
+        QVariant prefValue(const QString &key, const QVariant &defaultValue = {}) const;
+        void setPrefValue(const QString &key, const QVariant &value);
 
         // Called by RemoteTorrent after backfilling piece info from the properties API.
         void emitTorrentMetadataReceived(Torrent *torrent);
@@ -421,6 +427,7 @@ namespace BitTorrent
 
         Net::ApiClient *m_client;
         QTimer *m_pollTimer;
+        Net::PortForwarder *m_portForwarder;
         int m_rid = 0;
         bool m_restored = false;
         bool m_paused = false;
