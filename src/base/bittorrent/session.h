@@ -486,6 +486,12 @@ namespace BitTorrent
 
         virtual qint64 freeDiskSpace() const = 0;
 
+    protected:
+        static void setInstance(Session *instance);
+
+    private:
+        static Session *m_instance;
+
     signals:
         void startupProgressUpdated(int progress);
         void addTorrentFailed(const InfoHash &infoHash, const AddTorrentError &reason);

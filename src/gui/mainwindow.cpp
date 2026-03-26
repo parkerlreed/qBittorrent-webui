@@ -75,6 +75,7 @@
 #include "base/utils/password.h"
 #include "base/version.h"
 #include "aboutdialog.h"
+#include "remoteconnectdialog.h"
 #include "autoexpandabledialog.h"
 #include "cookiesdialog.h"
 #include "desktopintegration.h"
@@ -1328,6 +1329,19 @@ void MainWindow::on_actionOpen_triggered()
     const Path topDir {pathsList.at(0)};
     const Path parentDir = topDir.parentPath();
     pref->setMainLastDir(parentDir.isEmpty() ? topDir : parentDir);
+}
+
+void MainWindow::on_actionConnectToRemote_triggered()
+{
+    // No parent: connectToRemote() deletes MainWindow (and all its children),
+    // so the dialog must not be a child or it will be freed before accept() returns.
+    auto *dlg = new RemoteConnectDialog(nullptr);
+    connect(dlg, &RemoteConnectDialog::connected, this,
+            [this](const QUrl &baseUrl, const QString &username, const QString &password)
+            {
+                app()->connectToRemote(baseUrl, username, password);
+            });
+    dlg->open();
 }
 
 void MainWindow::activate()

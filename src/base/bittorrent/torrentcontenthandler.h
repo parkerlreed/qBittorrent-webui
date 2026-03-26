@@ -58,5 +58,10 @@ namespace BitTorrent
 
         virtual void prioritizeFiles(const QList<DownloadPriority> &priorities) = 0;
         virtual void flushCache() const = 0;
+
+        // Called each time the Files tab is rendered. Default is a no-op; remote
+        // implementations override to schedule an async file list refresh so that
+        // priority/progress changes made elsewhere appear on the next render cycle.
+        virtual void scheduleContentRefresh() {}
     };
 }

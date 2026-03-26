@@ -31,9 +31,12 @@ add_library(qbt_base STATIC
     bittorrent/peerinfo.h
     bittorrent/portforwarderimpl.h
     bittorrent/resumedatastorage.h
+    bittorrent/remotesession.h
+    bittorrent/remotetorrent.h
     bittorrent/session.h
     bittorrent/sessionimpl.h
     bittorrent/sessionstatus.h
+    bittorrent/torrentdata.h
     bittorrent/sharelimits.h
     bittorrent/speedmonitor.h
     bittorrent/sslparameters.h
@@ -74,6 +77,7 @@ add_library(qbt_base STATIC
     interfaces/iapplication.h
     logger.h
     net/dnsupdater.h
+    net/apiclient.h
     net/downloadhandlerimpl.h
     net/downloadmanager.h
     net/geoipdatabase.h
@@ -151,8 +155,11 @@ add_library(qbt_base STATIC
     bittorrent/peerinfo.cpp
     bittorrent/portforwarderimpl.cpp
     bittorrent/resumedatastorage.cpp
+    bittorrent/remotesession.cpp
+    bittorrent/remotetorrent.cpp
     bittorrent/sessionimpl.cpp
     bittorrent/speedmonitor.cpp
+    bittorrent/torrentdata.cpp
     bittorrent/sslparameters.cpp
     bittorrent/torrent.cpp
     bittorrent/torrentcontenthandler.cpp
@@ -175,6 +182,7 @@ add_library(qbt_base STATIC
     http/server.cpp
     logger.cpp
     net/dnsupdater.cpp
+    net/apiclient.cpp
     net/downloadhandlerimpl.cpp
     net/downloadmanager.cpp
     net/geoipdatabase.cpp

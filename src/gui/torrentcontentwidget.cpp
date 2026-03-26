@@ -127,6 +127,11 @@ void TorrentContentWidget::refresh()
     setUpdatesEnabled(false);
     m_model->refresh();
     setUpdatesEnabled(true);
+
+    // Ask the content handler to schedule an async data refresh (no-op for local
+    // torrents; RemoteTorrent uses this to keep file priorities/progress current).
+    if (BitTorrent::TorrentContentHandler *handler = m_model->contentHandler())
+        handler->scheduleContentRefresh();
 }
 
 bool TorrentContentWidget::openByEnterKey() const

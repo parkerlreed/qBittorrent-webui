@@ -166,6 +166,7 @@ private slots:
     void on_actionSetGlobalSpeedLimits_triggered();
     void on_actionDocumentation_triggered() const;
     void on_actionOpen_triggered();
+    void on_actionConnectToRemote_triggered();
     void on_actionDownloadFromURL_triggered();
     void on_actionExit_triggered();
     void on_actionLock_triggered();

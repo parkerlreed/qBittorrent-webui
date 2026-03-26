@@ -94,6 +94,8 @@
     <addaction name="actionDownloadFromURL"/>
     <addaction name="actionCloseWindow"/>
     <addaction name="separator"/>
+    <addaction name="actionConnectToRemote"/>
+    <addaction name="separator"/>
     <addaction name="actionExit"/>
    </widget>
    <widget class="QMenu" name="menuView">
@@ -173,6 +175,11 @@
    </property>
    <property name="iconText">
     <string>Open</string>
+   </property>
+  </action>
+  <action name="actionConnectToRemote">
+   <property name="text">
+    <string>Connect to &amp;Remote...</string>
    </property>
   </action>
   <action name="actionExit">

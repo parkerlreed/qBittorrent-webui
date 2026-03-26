@@ -30,6 +30,8 @@
 
 #pragma once
 
+#include <QUrl>
+
 #include "base/interfaces/iapplication.h"
 #include "gui/guiaddtorrentmanager.h"
 #include "gui/windowstate.h"
@@ -52,4 +54,7 @@ public:
 
     virtual bool isTorrentAddedNotificationsEnabled() const = 0;
     virtual void setTorrentAddedNotificationsEnabled(bool value) = 0;
+
+    virtual void connectToRemote(const QUrl &baseUrl, const QString &username, const QString &password) = 0;
+    virtual void disconnectFromRemote() = 0;
 };

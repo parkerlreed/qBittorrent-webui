@@ -10,6 +10,7 @@ qt_wrap_ui(UI_HEADERS
     cookiesdialog.ui
     deletionconfirmationdialog.ui
     downloadfromurldialog.ui
+    remoteconnectdialog.ui
     executionlogwidget.ui
     ipsubnetwhitelistoptionsdialog.ui
     mainwindow.ui
@@ -53,6 +54,7 @@ add_library(qbt_gui STATIC
     deletionconfirmationdialog.h
     desktopintegration.h
     downloadfromurldialog.h
+    remoteconnectdialog.h
     executionlogwidget.h
     filterpatternformat.h
     filterpatternformatmenu.h
@@ -159,6 +161,7 @@ add_library(qbt_gui STATIC
     deletionconfirmationdialog.cpp
     desktopintegration.cpp
     downloadfromurldialog.cpp
+    remoteconnectdialog.cpp
     executionlogwidget.cpp
     filterpatternformatmenu.cpp
     flowlayout.cpp

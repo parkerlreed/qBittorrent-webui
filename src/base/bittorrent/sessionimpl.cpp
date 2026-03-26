@@ -378,23 +378,28 @@ struct BitTorrent::SessionImpl::ResumeSessionContext final : public QObject
 
 const int addTorrentParamsId = qRegisterMetaType<AddTorrentParams>();
 
-Session *SessionImpl::m_instance = nullptr;
+Session *Session::m_instance = nullptr;
+
+void Session::setInstance(Session *instance)
+{
+    m_instance = instance;
+}
 
 void Session::initInstance()
 {
-    if (!SessionImpl::m_instance)
-        SessionImpl::m_instance = new SessionImpl;
+    if (!m_instance)
+        Session::setInstance(new SessionImpl);
 }
 
 void Session::freeInstance()
 {
-    delete SessionImpl::m_instance;
-    SessionImpl::m_instance = nullptr;
+    delete m_instance;
+    m_instance = nullptr;
 }
 
 Session *Session::instance()
 {
-    return SessionImpl::m_instance;
+    return m_instance;
 }
 
 bool Session::isValidCategoryName(const QString &name)

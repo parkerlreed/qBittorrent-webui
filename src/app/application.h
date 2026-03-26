@@ -55,6 +55,7 @@
 
 class ApplicationInstanceManager;
 class FileLogger;
+class QUrl;
 
 namespace BitTorrent
 {
@@ -145,6 +146,9 @@ public:
 
     bool isTorrentAddedNotificationsEnabled() const override;
     void setTorrentAddedNotificationsEnabled(bool value) override;
+
+    void connectToRemote(const QUrl &baseUrl, const QString &username, const QString &password);
+    void disconnectFromRemote();
 #endif
 
 private slots:

@@ -66,6 +66,7 @@
 
 #include "base/addtorrentmanager.h"
 #include "base/bittorrent/infohash.h"
+#include "base/bittorrent/remotesession.h"
 #include "base/bittorrent/session.h"
 #include "base/bittorrent/torrent.h"
 #include "base/exceptions.h"
@@ -358,6 +359,33 @@ DesktopIntegration *Application::desktopIntegration()
 MainWindow *Application::mainWindow()
 {
     return m_window;
+}
+
+void Application::connectToRemote(const QUrl &baseUrl, const QString &username, const QString &password)
+{
+    // Hot-swap: destroy the current MainWindow (drops all signal connections),
+    // free the local session, create RemoteSession, then create a new MainWindow.
+    delete m_window;
+    m_window = nullptr;
+
+    BitTorrent::Session::freeInstance();
+    BitTorrent::RemoteSession::initInstance(baseUrl, username, password);
+
+    m_window = new MainWindow(this, WindowState::Normal, instanceName());
+    m_window->show();
+}
+
+void Application::disconnectFromRemote()
+{
+    // Tear down the remote session and restore local session.
+    delete m_window;
+    m_window = nullptr;
+
+    BitTorrent::Session::freeInstance();
+    BitTorrent::Session::initInstance();
+
+    m_window = new MainWindow(this, WindowState::Normal, instanceName());
+    m_window->show();
 }
 
 WindowState Application::startUpWindowState() const

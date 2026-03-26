@@ -543,6 +543,8 @@ namespace BitTorrent
             TorrentRemoveOption removeOption {};
         };
 
+        friend void Session::initInstance();
+
         explicit SessionImpl(QObject *parent = nullptr);
         ~SessionImpl();
 
@@ -881,9 +883,5 @@ namespace BitTorrent
         QTimer *m_freeDiskSpaceCheckingTimer = nullptr;
         qint64 m_freeDiskSpace = -1;
 
-        friend void Session::initInstance();
-        friend void Session::freeInstance();
-        friend Session *Session::instance();
-        static Session *m_instance;
     };
 }
