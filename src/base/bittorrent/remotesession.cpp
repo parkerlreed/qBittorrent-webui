@@ -43,6 +43,7 @@
 #include "sharelimits.h"
 #include "torrentcontentlayout.h"
 #include "torrentcontentremoveoption.h"
+#include "infohash.h"
 #include "torrentdescriptor.h"
 
 namespace
@@ -1992,6 +1993,9 @@ namespace BitTorrent
     bool RemoteSession::addTorrent(const TorrentDescriptor &torrentDescr, const AddTorrentParams &params)
     {
         QVariantMap apiParams;
+
+        if (!params.name.isEmpty())
+            apiParams[u"rename"_s] = params.name;
         if (!params.savePath.isEmpty())
             apiParams[u"savepath"_s] = params.savePath.toString();
         if (!params.category.isEmpty())
@@ -2003,20 +2007,34 @@ namespace BitTorrent
                 tagList.append(tag.toString());
             apiParams[u"tags"_s] = tagList.join(u',');
         }
+        if (params.useAutoTMM.has_value())
+            apiParams[u"autoTMM"_s] = *params.useAutoTMM ? u"true"_s : u"false"_s;
         if (params.addStopped.has_value())
-            apiParams[u"stopped"_s] = *params.addStopped;
+            apiParams[u"stopped"_s] = *params.addStopped ? u"true"_s : u"false"_s;
         if (params.addForced)
-            apiParams[u"forceStart"_s] = true;
+            apiParams[u"forced"_s] = u"true"_s;
+        if (params.addToQueueTop.has_value())
+            apiParams[u"addToTopOfQueue"_s] = *params.addToQueueTop ? u"true"_s : u"false"_s;
         if (params.sequential)
-            apiParams[u"sequentialDownload"_s] = true;
+            apiParams[u"sequentialDownload"_s] = u"true"_s;
         if (params.firstLastPiecePriority)
-            apiParams[u"firstLastPiecePrio"_s] = true;
+            apiParams[u"firstLastPiecePrio"_s] = u"true"_s;
+        if (params.skipChecking)
+            apiParams[u"skip_checking"_s] = u"true"_s;
+        if (params.contentLayout.has_value())
+            apiParams[u"contentLayout"_s] = Utils::String::fromEnum(*params.contentLayout);
+        if (params.stopCondition.has_value())
+            apiParams[u"stopCondition"_s] = Utils::String::fromEnum(*params.stopCondition);
         if (params.uploadLimit >= 0)
-            apiParams[u"upLimit"_s] = params.uploadLimit;
+            apiParams[u"upLimit"_s] = QString::number(params.uploadLimit);
         if (params.downloadLimit >= 0)
-            apiParams[u"dlLimit"_s] = params.downloadLimit;
+            apiParams[u"dlLimit"_s] = QString::number(params.downloadLimit);
+        if (params.ratioLimit != DEFAULT_RATIO_LIMIT)
+            apiParams[u"ratioLimit"_s] = QString::number(params.ratioLimit);
+        if (params.seedingTimeLimit != DEFAULT_SEEDING_TIME_LIMIT)
+            apiParams[u"seedingTimeLimit"_s] = QString::number(params.seedingTimeLimit);
 
-        // Try to get raw buffer from descriptor; fall back to magnet URI
+        // Try to get raw .torrent buffer; fall back to magnet URI
         const auto buf = torrentDescr.saveToBuffer();
         if (buf)
         {
@@ -2024,12 +2042,29 @@ namespace BitTorrent
         }
         else
         {
-            // Magnet URI path: encode as URLs in params
-            // The torrentDescr may be a magnet URI — extract the source from the info hash
-            QString magnetUrl;
-            magnetUrl += u"magnet:?xt=urn:btih:"_s;
-            magnetUrl += torrentDescr.infoHash().toString();
-            apiParams[u"urls"_s] = magnetUrl;
+            // Build a proper magnet URI from the descriptor.
+            // InfoHash::toString() is for logging only (returns "v1, v2" for hybrid torrents).
+            // Use v1()/v2() directly to construct the xt= parameters.
+            const InfoHash &ih = torrentDescr.infoHash();
+            QString magnet = u"magnet:?"_s;
+            bool firstParam = true;
+            if (ih.v1().isValid())
+            {
+                magnet += u"xt=urn:btih:"_s + ih.v1().toString();
+                firstParam = false;
+            }
+            if (ih.v2().isValid())
+            {
+                if (!firstParam)
+                    magnet += u"&"_s;
+                // btmh multihash prefix: 0x1220 = SHA-256, 32 bytes
+                magnet += u"xt=urn:btmh:1220"_s + ih.v2().toString();
+            }
+            if (!torrentDescr.name().isEmpty())
+                magnet += u"&dn="_s + QString::fromUtf8(QUrl::toPercentEncoding(torrentDescr.name()));
+            for (const TrackerEntry &tracker : torrentDescr.trackers())
+                magnet += u"&tr="_s + QString::fromUtf8(QUrl::toPercentEncoding(tracker.url));
+            apiParams[u"urls"_s] = magnet;
             m_client->torrentsAdd({}, apiParams);
         }
         return true;

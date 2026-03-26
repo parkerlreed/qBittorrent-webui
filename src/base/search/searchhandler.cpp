@@ -84,7 +84,7 @@ namespace
 }
 
 SearchHandler::SearchHandler(const QString &pattern, const QString &category, const QStringList &usedPlugins, SearchPluginManager *manager)
-    : QObject(manager)
+    : AbstractSearchHandler(manager)
     , m_pattern {pattern}
     , m_category {category}
     , m_usedPlugins {usedPlugins}

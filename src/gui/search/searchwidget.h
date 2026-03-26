@@ -32,6 +32,7 @@
 
 #include <QPointer>
 #include <QSet>
+#include <QVariant>
 #include <QWidget>
 
 #include "base/utils/thread.h"
@@ -116,4 +117,8 @@ private:
     DataStorage *m_dataStorage = nullptr;
 
     QStringListModel *m_searchPatternCompleterModel = nullptr;
+
+    // In remote mode: plugin list fetched from /api/v2/search/plugins.
+    // Each entry is a QVariantMap with keys: name, fullName, supportedCategories, enabled.
+    QVariantList m_remotePlugins;
 };

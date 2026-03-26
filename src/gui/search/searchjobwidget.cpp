@@ -42,6 +42,7 @@
 
 #include "base/logger.h"
 #include "base/preferences.h"
+#include "base/search/abstractsearchhandler.h"
 #include "base/search/searchdownloadhandler.h"
 #include "base/search/searchhandler.h"
 #include "base/search/searchpluginmanager.h"
@@ -199,7 +200,7 @@ SearchJobWidget::SearchJobWidget(const QString &id, const QString &searchPattern
     appendSearchResults(searchResults);
 }
 
-SearchJobWidget::SearchJobWidget(const QString &id, SearchHandler *searchHandler, IGUIApplication *app, QWidget *parent)
+SearchJobWidget::SearchJobWidget(const QString &id, AbstractSearchHandler *searchHandler, IGUIApplication *app, QWidget *parent)
     : SearchJobWidget(id, app, parent)
 {
     assignSearchHandler(searchHandler);
@@ -283,7 +284,7 @@ LineEdit *SearchJobWidget::lineEditSearchResultsFilter() const
     return m_lineEditSearchResultsFilter;
 }
 
-void SearchJobWidget::assignSearchHandler(SearchHandler *searchHandler)
+void SearchJobWidget::assignSearchHandler(AbstractSearchHandler *searchHandler)
 {
     Q_ASSERT(searchHandler);
     if (!searchHandler) [[unlikely]]
@@ -295,9 +296,9 @@ void SearchJobWidget::assignSearchHandler(SearchHandler *searchHandler)
 
     m_searchHandler = searchHandler;
     m_searchHandler->setParent(this);
-    connect(m_searchHandler, &SearchHandler::newSearchResults, this, &SearchJobWidget::appendSearchResults);
-    connect(m_searchHandler, &SearchHandler::searchFinished, this, &SearchJobWidget::searchFinished);
-    connect(m_searchHandler, &SearchHandler::searchFailed, this, &SearchJobWidget::searchFailed);
+    connect(m_searchHandler, &AbstractSearchHandler::newSearchResults, this, &SearchJobWidget::appendSearchResults);
+    connect(m_searchHandler, &AbstractSearchHandler::searchFinished, this, &SearchJobWidget::searchFinished);
+    connect(m_searchHandler, &AbstractSearchHandler::searchFailed, this, &SearchJobWidget::searchFailed);
 
     m_searchPattern = m_searchHandler->pattern();
 

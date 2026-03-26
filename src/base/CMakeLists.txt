@@ -101,6 +101,7 @@ add_library(qbt_base STATIC
     rss/rss_item.h
     rss/rss_parser.h
     rss/rss_session.h
+    search/abstractsearchhandler.h
     search/searchdownloadhandler.h
     search/searchhandler.h
     search/searchpluginmanager.h

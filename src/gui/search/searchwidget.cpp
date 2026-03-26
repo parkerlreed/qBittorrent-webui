@@ -54,12 +54,17 @@
 #include <QStringListModel>
 #include <QThread>
 
+#include "base/bittorrent/remotesession.h"
+#include "base/bittorrent/session.h"
 #include "base/global.h"
 #include "base/logger.h"
+#include "base/net/apiclient.h"
 #include "base/preferences.h"
 #include "base/profile.h"
+#include "base/search/abstractsearchhandler.h"
 #include "base/search/searchhandler.h"
 #include "base/search/searchpluginmanager.h"
+#include "remotesearchhandler.h"
 #include "base/utils/bytearray.h"
 #include "base/utils/compare.h"
 #include "base/utils/datetime.h"
@@ -401,20 +406,52 @@ SearchWidget::SearchWidget(IGUIApplication *app, QWidget *parent)
         }
     });
 
-    const auto *searchManager = SearchPluginManager::instance();
-    const auto onPluginChanged = [this]()
+    if (auto *rs = qobject_cast<BitTorrent::RemoteSession *>(BitTorrent::Session::instance()))
     {
+        // Remote mode: populate defaults immediately and show the search page.
         fillPluginComboBox();
         fillCatCombobox();
-        selectActivePage();
-    };
-    connect(searchManager, &SearchPluginManager::pluginInstalled, this, onPluginChanged);
-    connect(searchManager, &SearchPluginManager::pluginUninstalled, this, onPluginChanged);
-    connect(searchManager, &SearchPluginManager::pluginUpdated, this, onPluginChanged);
-    connect(searchManager, &SearchPluginManager::pluginEnabled, this, onPluginChanged);
+        m_ui->stackedPages->setCurrentWidget(m_ui->searchPage);
+        m_ui->lineEditSearchPattern->setEnabled(true);
+        m_ui->comboCategory->setEnabled(true);
+        m_ui->selectPlugin->setEnabled(true);
+        m_ui->searchButton->setEnabled(true);
 
-    // Fill in category combobox
-    onPluginChanged();
+        const auto fetchPlugins = [this, rs]()
+        {
+            rs->apiClient()->searchPlugins().then(this, [this](const QVariantList &plugins)
+            {
+                m_remotePlugins = plugins;
+                fillPluginComboBox();
+                fillCatCombobox();
+            }).onFailed(this, [](const std::exception &e)
+            {
+                qDebug() << "searchPlugins() failed:" << e.what();
+            });
+        };
+
+        if (rs->apiClient()->isLoggedIn())
+            fetchPlugins();
+        else
+            connect(rs->apiClient(), &Net::ApiClient::loggedIn, this, fetchPlugins, Qt::SingleShotConnection);
+    }
+    else
+    {
+        const auto *searchManager = SearchPluginManager::instance();
+        const auto onPluginChanged = [this]()
+        {
+            fillPluginComboBox();
+            fillCatCombobox();
+            selectActivePage();
+        };
+        connect(searchManager, &SearchPluginManager::pluginInstalled, this, onPluginChanged);
+        connect(searchManager, &SearchPluginManager::pluginUninstalled, this, onPluginChanged);
+        connect(searchManager, &SearchPluginManager::pluginUpdated, this, onPluginChanged);
+        connect(searchManager, &SearchPluginManager::pluginEnabled, this, onPluginChanged);
+
+        // Fill in category combobox
+        onPluginChanged();
+    }
 
     connect(m_ui->pluginsButton, &QPushButton::clicked, this, &SearchWidget::pluginsButtonClicked);
     connect(m_ui->searchButton, &QPushButton::clicked, this, &SearchWidget::searchButtonClicked);
@@ -570,9 +607,39 @@ void SearchWidget::fillCatCombobox()
 
     using QStrPair = std::pair<QString, QString>;
     QList<QStrPair> tmpList;
+
     const auto selectedPlugin = m_ui->selectPlugin->itemData(m_ui->selectPlugin->currentIndex()).toString();
-    for (const QString &cat : asConst(SearchPluginManager::instance()->getPluginCategories(selectedPlugin)))
-        tmpList << std::make_pair(SearchPluginManager::categoryFullName(cat), cat);
+
+    if (!m_remotePlugins.isEmpty())
+    {
+        QSet<QString> seen;
+        for (const QVariant &v : m_remotePlugins)
+        {
+            const QVariantMap m = v.toMap();
+            const QString name = m.value(u"name"_s).toString();
+            // Include categories from the selected plugin, or all enabled plugins for "all"/"enabled"/"multi"
+            if (selectedPlugin != u"all"_s && selectedPlugin != u"enabled"_s
+                    && selectedPlugin != u"multi"_s && name != selectedPlugin)
+                continue;
+            if (!m.value(u"enabled"_s).toBool() && selectedPlugin != u"all"_s)
+                continue;
+            for (const QVariant &catV : m.value(u"supportedCategories"_s).toList())
+            {
+                const QString cat = catV.toMap().value(u"id"_s).toString();
+                if (!cat.isEmpty() && !seen.contains(cat))
+                {
+                    seen.insert(cat);
+                    tmpList << std::make_pair(SearchPluginManager::categoryFullName(cat), cat);
+                }
+            }
+        }
+    }
+    else
+    {
+        for (const QString &cat : asConst(SearchPluginManager::instance()->getPluginCategories(selectedPlugin)))
+            tmpList << std::make_pair(SearchPluginManager::categoryFullName(cat), cat);
+    }
+
     std::ranges::sort(tmpList, [](const QStrPair &l, const QStrPair &r) { return (QString::localeAwareCompare(l.first, r.first) < 0); });
 
     for (const QStrPair &p : asConst(tmpList))
@@ -594,8 +661,24 @@ void SearchWidget::fillPluginComboBox()
 
     using QStrPair = std::pair<QString, QString>;
     QList<QStrPair> tmpList;
-    for (const QString &name : asConst(SearchPluginManager::instance()->enabledPlugins()))
-        tmpList << std::make_pair(SearchPluginManager::instance()->pluginFullName(name), name);
+
+    if (!m_remotePlugins.isEmpty())
+    {
+        for (const QVariant &v : m_remotePlugins)
+        {
+            const QVariantMap m = v.toMap();
+            if (!m.value(u"enabled"_s).toBool())
+                continue;
+            tmpList << std::make_pair(m.value(u"fullName"_s).toString(),
+                                      m.value(u"name"_s).toString());
+        }
+    }
+    else
+    {
+        for (const QString &name : asConst(SearchPluginManager::instance()->enabledPlugins()))
+            tmpList << std::make_pair(SearchPluginManager::instance()->pluginFullName(name), name);
+    }
+
     std::ranges::sort(tmpList, [](const QStrPair &l, const QStrPair &r) { return (QString::localeAwareCompare(l.first, r.first) < 0); });
 
     for (const QStrPair &p : asConst(tmpList))
@@ -613,6 +696,12 @@ QString SearchWidget::selectedCategory() const
 QStringList SearchWidget::selectedPlugins() const
 {
     const auto itemText = m_ui->selectPlugin->itemData(m_ui->selectPlugin->currentIndex()).toString();
+
+    if (!m_remotePlugins.isEmpty())
+    {
+        // In remote mode the API accepts "all", "enabled", or a plugin name directly.
+        return {itemText};
+    }
 
     if (itemText == u"all")
         return SearchPluginManager::instance()->allPlugins();
@@ -746,7 +835,10 @@ void SearchWidget::restoreSession()
 
 void SearchWidget::selectActivePage()
 {
-    if (SearchPluginManager::instance()->allPlugins().isEmpty())
+    const bool hasPlugins = !m_remotePlugins.isEmpty()
+        || !SearchPluginManager::instance()->allPlugins().isEmpty();
+
+    if (!hasPlugins)
     {
         m_ui->stackedPages->setCurrentWidget(m_ui->emptyPage);
         m_ui->lineEditSearchPattern->setEnabled(false);
@@ -885,16 +977,25 @@ void SearchWidget::searchButtonClicked()
         return;
     }
 
-    if (!Utils::ForeignApps::pythonInfo().isValid())
-    {
-        app()->desktopIntegration()->showNotification(tr("Search Engine"), tr("Please install Python to use the Search Engine."));
-        return;
-    }
-
     qDebug("Search with category: %s", qUtf8Printable(selectedCategory()));
 
-    // Launch search
-    auto *searchHandler = SearchPluginManager::instance()->startSearch(pattern, selectedCategory(), selectedPlugins());
+    AbstractSearchHandler *searchHandler = nullptr;
+
+    if (auto *rs = qobject_cast<BitTorrent::RemoteSession *>(BitTorrent::Session::instance()))
+    {
+        const QString plugins = selectedPlugins().join(u'|');
+        searchHandler = new RemoteSearchHandler(pattern, selectedCategory(), plugins,
+                                                rs->apiClient(), this);
+    }
+    else
+    {
+        if (!Utils::ForeignApps::pythonInfo().isValid())
+        {
+            app()->desktopIntegration()->showNotification(tr("Search Engine"), tr("Please install Python to use the Search Engine."));
+            return;
+        }
+        searchHandler = SearchPluginManager::instance()->startSearch(pattern, selectedCategory(), selectedPlugins());
+    }
 
     // Tab Addition
     const QString newTabID = generateTabID();

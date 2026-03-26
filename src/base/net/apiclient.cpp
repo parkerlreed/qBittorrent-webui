@@ -490,7 +490,14 @@ namespace Net
             multiPart->append(part);
         }
 
-        QNetworkRequest req = makeRequest(u"/api/v2/torrents/add"_s);
+        // Use a plain request without the form-encoded Content-Type (multipart sets its own)
+        QUrl url = m_baseUrl;
+        url.setPath(u"/api/v2/torrents/add"_s);
+        QNetworkRequest req(url);
+        if (!m_sid.isEmpty())
+            req.setRawHeader("Cookie", (u"SID="_s + m_sid).toUtf8());
+        req.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                         QNetworkRequest::NoLessSafeRedirectPolicy);
         QNetworkReply *reply = m_nam->post(req, multiPart);
         multiPart->setParent(reply);
 
@@ -499,7 +506,7 @@ namespace Net
         QFuture<QByteArray> future = promise->future();
         bridgeReplyToPromise(reply, promise);
 
-        return future.then([](QByteArray) {});
+        return future.then([](QByteArray) {}).onFailed([](const std::exception &) {});
     }
 
     QFuture<void> ApiClient::torrentsAddTrackers(const QString &hash, const QString &urlsNewlineSeparated)
@@ -649,6 +656,49 @@ namespace Net
         return postForm(u"/api/v2/torrents/deleteTags"_s, form).then([](QByteArray) {});
     }
 
+    // --- Search ---
+
+    QFuture<QVariantMap> ApiClient::searchStart(const QString &pattern, const QString &category, const QString &plugins)
+    {
+        QUrlQuery form;
+        form.addQueryItem(u"pattern"_s, pattern);
+        form.addQueryItem(u"category"_s, category);
+        form.addQueryItem(u"plugins"_s, plugins);
+        return postForm(u"/api/v2/search/start"_s, form).then(
+            [](const QByteArray &data) -> QVariantMap
+            {
+                return QJsonDocument::fromJson(data).object().toVariantMap();
+            });
+    }
+
+    QFuture<QVariantMap> ApiClient::searchResults(int id, int offset)
+    {
+        QUrlQuery query;
+        query.addQueryItem(u"id"_s, QString::number(id));
+        query.addQueryItem(u"offset"_s, QString::number(offset));
+        return getRaw(u"/api/v2/search/results"_s, query).then(
+            [](const QByteArray &data) -> QVariantMap
+            {
+                return QJsonDocument::fromJson(data).object().toVariantMap();
+            });
+    }
+
+    QFuture<void> ApiClient::searchStop(int id)
+    {
+        QUrlQuery form;
+        form.addQueryItem(u"id"_s, QString::number(id));
+        return postForm(u"/api/v2/search/stop"_s, form).then([](QByteArray) {});
+    }
+
+    QFuture<QVariantList> ApiClient::searchPlugins()
+    {
+        return getRaw(u"/api/v2/search/plugins"_s).then(
+            [](const QByteArray &data) -> QVariantList
+            {
+                return QJsonDocument::fromJson(data).array().toVariantList();
+            });
+    }
+
     // --- Private helpers ---
 
     QNetworkRequest ApiClient::makeRequest(const QString &apiPath) const
@@ -712,6 +762,29 @@ namespace Net
         QNetworkRequest req = makeRequest(apiPath);
         req.setHeader(QNetworkRequest::ContentTypeHeader, contentType);
         QNetworkReply *reply = m_nam->post(req, body);
+
+        // Capture SID from login response (Set-Cookie header)
+        connect(reply, &QNetworkReply::finished, this, [this, reply]()
+        {
+            const QList<QNetworkReply::RawHeaderPair> headers = reply->rawHeaderPairs();
+            for (const auto &[name, value] : headers)
+            {
+                if (name.toLower() == "set-cookie")
+                {
+                    const QString cookieStr = QString::fromUtf8(value);
+                    for (const QString &part : cookieStr.split(u';'))
+                    {
+                        const QString trimmed = part.trimmed();
+                        if (trimmed.startsWith(u"SID="_s))
+                        {
+                            m_sid = trimmed.mid(4);
+                            break;
+                        }
+                    }
+                    break;
+                }
+            }
+        });
 
         auto promise = std::make_shared<QPromise<QByteArray>>();
         promise->start();

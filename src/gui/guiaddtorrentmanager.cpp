@@ -31,6 +31,7 @@
 
 #include <QScreen>
 
+#include "base/bittorrent/remotesession.h"
 #include "base/bittorrent/session.h"
 #include "base/bittorrent/torrentdescriptor.h"
 #include "base/net/downloadmanager.h"
@@ -40,6 +41,7 @@
 #include "interfaces/iguiapplication.h"
 #include "mainwindow.h"
 #include "raisedmessagebox.h"
+#include "remoteaddtorrentdialog.h"
 
 namespace
 {
@@ -186,6 +188,19 @@ void GUIAddTorrentManager::onMetadataDownloaded(const BitTorrent::TorrentInfo &m
 bool GUIAddTorrentManager::processTorrent(const QString &source
         , const BitTorrent::TorrentDescriptor &torrentDescr, const BitTorrent::AddTorrentParams &params)
 {
+    // In remote mode, skip the local metadata-fetching dialog entirely.
+    // Show a lightweight dialog with basic options, then POST to the API.
+    if (qobject_cast<BitTorrent::RemoteSession *>(btSession()))
+    {
+        auto *dlg = new RemoteAddTorrentDialog(source, app()->mainWindow());
+        connect(dlg, &QDialog::accepted, this, [this, source, torrentDescr, dlg]()
+        {
+            addTorrentToSession(source, torrentDescr, dlg->params());
+        });
+        dlg->show();
+        return true;
+    }
+
     const bool hasMetadata = torrentDescr.info().has_value();
     const BitTorrent::InfoHash infoHash = torrentDescr.infoHash();
 

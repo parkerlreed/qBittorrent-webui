@@ -30,31 +30,18 @@
 #pragma once
 
 #include <QByteArray>
-#include <QDateTime>
 #include <QList>
-#include <QObject>
 #include <QString>
 #include <QtContainerFwd>
+
+#include "abstractsearchhandler.h"
 
 class QProcess;
 class QTimer;
 
-struct SearchResult
-{
-    QString fileName;
-    QString fileUrl;
-    qlonglong fileSize = 0;
-    qlonglong nbSeeders = 0;
-    qlonglong nbLeechers = 0;
-    QString engineName;
-    QString siteUrl;
-    QString descrLink;
-    QDateTime pubDate;
-};
-
 class SearchPluginManager;
 
-class SearchHandler : public QObject
+class SearchHandler : public AbstractSearchHandler
 {
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(SearchHandler)
@@ -65,17 +52,12 @@ class SearchHandler : public QObject
                   , const QStringList &usedPlugins, SearchPluginManager *manager);
 
 public:
-    bool isActive() const;
-    QString pattern() const;
+    bool isActive() const override;
+    QString pattern() const override;
     SearchPluginManager *manager() const;
     QList<SearchResult> results() const;
 
-    void cancelSearch();
-
-signals:
-    void searchFinished(bool cancelled = false);
-    void searchFailed(const QString &errorMessage);
-    void newSearchResults(const QList<SearchResult> &results);
+    void cancelSearch() override;
 
 private:
     void readSearchOutput();

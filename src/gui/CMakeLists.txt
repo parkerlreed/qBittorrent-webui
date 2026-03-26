@@ -54,6 +54,7 @@ add_library(qbt_gui STATIC
     deletionconfirmationdialog.h
     desktopintegration.h
     downloadfromurldialog.h
+    remoteaddtorrentdialog.h
     remoteconnectdialog.h
     executionlogwidget.h
     filterpatternformat.h
@@ -96,6 +97,7 @@ add_library(qbt_gui STATIC
     rss/rsswidget.h
     search/pluginselectdialog.h
     search/pluginsourcedialog.h
+    search/remotesearchhandler.h
     search/searchjobwidget.h
     search/searchsortmodel.h
     search/searchwidget.h
@@ -161,6 +163,7 @@ add_library(qbt_gui STATIC
     deletionconfirmationdialog.cpp
     desktopintegration.cpp
     downloadfromurldialog.cpp
+    remoteaddtorrentdialog.cpp
     remoteconnectdialog.cpp
     executionlogwidget.cpp
     filterpatternformatmenu.cpp
@@ -200,6 +203,7 @@ add_library(qbt_gui STATIC
     rss/rsswidget.cpp
     search/pluginselectdialog.cpp
     search/pluginsourcedialog.cpp
+    search/remotesearchhandler.cpp
     search/searchjobwidget.cpp
     search/searchsortmodel.cpp
     search/searchwidget.cpp

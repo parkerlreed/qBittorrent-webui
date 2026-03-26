@@ -116,6 +116,12 @@ namespace Net
         QFuture<void> torrentsSetSSLParameters(const QString &hash, const QVariantMap &sslParams);
         QFuture<void> torrentsSetComment(const QString &hash, const QString &comment);
 
+        // Search
+        QFuture<QVariantMap> searchStart(const QString &pattern, const QString &category, const QString &plugins);
+        QFuture<QVariantMap> searchResults(int id, int offset = 0);
+        QFuture<void> searchStop(int id);
+        QFuture<QVariantList> searchPlugins();
+
         // Categories / tags
         QFuture<QVariantMap> categories();
         QFuture<void> createCategory(const QString &name, const QString &savePath,

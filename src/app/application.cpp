@@ -363,13 +363,17 @@ MainWindow *Application::mainWindow()
 
 void Application::connectToRemote(const QUrl &baseUrl, const QString &username, const QString &password)
 {
-    // Hot-swap: destroy the current MainWindow (drops all signal connections),
-    // free the local session, create RemoteSession, then create a new MainWindow.
+    // Hot-swap: destroy MainWindow, free session, create RemoteSession, rebuild.
     delete m_window;
     m_window = nullptr;
 
+    delete m_addTorrentManager;
+    m_addTorrentManager = nullptr;
+
     BitTorrent::Session::freeInstance();
     BitTorrent::RemoteSession::initInstance(baseUrl, username, password);
+
+    m_addTorrentManager = new AddTorrentManagerImpl(this, BitTorrent::Session::instance(), this);
 
     m_window = new MainWindow(this, WindowState::Normal, instanceName());
     m_window->show();
@@ -381,8 +385,13 @@ void Application::disconnectFromRemote()
     delete m_window;
     m_window = nullptr;
 
+    delete m_addTorrentManager;
+    m_addTorrentManager = nullptr;
+
     BitTorrent::Session::freeInstance();
     BitTorrent::Session::initInstance();
+
+    m_addTorrentManager = new AddTorrentManagerImpl(this, BitTorrent::Session::instance(), this);
 
     m_window = new MainWindow(this, WindowState::Normal, instanceName());
     m_window->show();

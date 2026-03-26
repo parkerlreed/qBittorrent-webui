@@ -42,8 +42,8 @@ class QHeaderView;
 class QModelIndex;
 class QStandardItemModel;
 
+class AbstractSearchHandler;
 class LineEdit;
-class SearchHandler;
 class SearchSortModel;
 struct SearchResult;
 
@@ -78,7 +78,7 @@ public:
     };
 
     SearchJobWidget(const QString &id, const QString &searchPattern, const QList<SearchResult> &searchResults, IGUIApplication *app, QWidget *parent = nullptr);
-    SearchJobWidget(const QString &id, SearchHandler *searchHandler, IGUIApplication *app, QWidget *parent = nullptr);
+    SearchJobWidget(const QString &id, AbstractSearchHandler *searchHandler, IGUIApplication *app, QWidget *parent = nullptr);
     ~SearchJobWidget() override;
 
     QString id() const;
@@ -88,7 +88,7 @@ public:
     int visibleResultsCount() const;
     LineEdit *lineEditSearchResultsFilter() const;
 
-    void assignSearchHandler(SearchHandler *searchHandler);
+    void assignSearchHandler(AbstractSearchHandler *searchHandler);
     void cancelSearch();
 
 signals:
@@ -140,7 +140,7 @@ private:
     QString m_searchPattern;
     QList<SearchResult> m_searchResults;
     Ui::SearchJobWidget *m_ui = nullptr;
-    SearchHandler *m_searchHandler = nullptr;
+    AbstractSearchHandler *m_searchHandler = nullptr;
     QStandardItemModel *m_searchListModel = nullptr;
     SearchSortModel *m_proxyModel = nullptr;
     LineEdit *m_lineEditSearchResultsFilter = nullptr;
