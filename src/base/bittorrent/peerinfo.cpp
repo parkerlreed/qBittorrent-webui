@@ -28,9 +28,13 @@
 
 #include "peerinfo.h"
 
+#include <libtorrent/address.hpp>
+#include <libtorrent/error_code.hpp>
+
 #include <QBitArray>
 
 #include "base/bittorrent/ltqbitarray.h"
+#include "base/global.h"
 #include "base/net/geoipmanager.h"
 #include "base/unicodestrings.h"
 #include "base/utils/bytearray.h"
@@ -43,6 +47,39 @@ PeerInfo::PeerInfo(const lt::peer_info &nativeInfo, const QBitArray &allPieces)
     , m_relevance(calcRelevance(allPieces))
 {
     determineFlags();
+}
+
+PeerInfo::PeerInfo(const QVariantMap &data)
+{
+    // IP + port
+    const QString ipStr = data.value(u"ip"_s).toString();
+    const int port = data.value(u"port"_s).toInt();
+    lt::error_code ec;
+    const lt::address addr = lt::make_address(ipStr.toStdString(), ec);
+    if (!ec)
+        m_nativeInfo.ip = lt::tcp::endpoint(addr, static_cast<unsigned short>(port));
+
+    m_nativeInfo.client = data.value(u"client"_s).toString().toStdString();
+    m_nativeInfo.progress = static_cast<float>(data.value(u"progress"_s).toDouble());
+    m_nativeInfo.payload_down_speed = data.value(u"dl_speed"_s).toInt();
+    m_nativeInfo.payload_up_speed = data.value(u"up_speed"_s).toInt();
+    m_nativeInfo.total_download = data.value(u"downloaded"_s).toLongLong();
+    m_nativeInfo.total_upload = data.value(u"uploaded"_s).toLongLong();
+
+    const QString conn = data.value(u"connection"_s).toString();
+    if (conn == u"uTP"_s)
+        m_nativeInfo.flags |= lt::peer_info::utp_socket;
+    else if (conn == u"Web"_s)
+        m_nativeInfo.connection_type = lt::peer_info::web_seed;
+
+    // Use flags/desc strings directly from the API instead of recomputing
+    m_flags = data.value(u"flags"_s).toString().trimmed();
+    m_flagsDescription = data.value(u"flags_desc"_s).toString().trimmed();
+
+    // Country provided directly; avoid GeoIP lookup
+    m_country = data.value(u"country_code"_s).toString().toUpper();
+
+    m_relevance = data.value(u"relevance"_s).toDouble();
 }
 
 bool PeerInfo::fromDHT() const

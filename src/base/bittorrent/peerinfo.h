@@ -31,6 +31,7 @@
 #include <libtorrent/peer_info.hpp>
 
 #include <QCoreApplication>
+#include <QVariantMap>
 
 class QBitArray;
 
@@ -45,6 +46,7 @@ namespace BitTorrent
     public:
         PeerInfo() = default;
         PeerInfo(const lt::peer_info &nativeInfo, const QBitArray &allPieces);
+        explicit PeerInfo(const QVariantMap &data);
 
         bool fromDHT() const;
         bool fromPeX() const;

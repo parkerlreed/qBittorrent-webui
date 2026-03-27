@@ -680,9 +680,16 @@ namespace BitTorrent
 
     QFuture<QList<PeerInfo>> RemoteTorrent::fetchPeerInfo() const
     {
-        // PeerInfo wraps a libtorrent native type; we cannot reconstruct it from JSON.
-        // Return an empty list — the peers tab will show nothing for remote connections.
-        return QtFuture::makeReadyValueFuture(QList<PeerInfo>{});
+        return m_client->torrentsPeers(hashStr()).then(
+            [](const QVariantMap &data) -> QList<PeerInfo>
+            {
+                const QVariantMap peers = data.value(u"peers"_s).toMap();
+                QList<PeerInfo> result;
+                result.reserve(peers.size());
+                for (const QVariant &peerVar : peers)
+                    result.append(PeerInfo(peerVar.toMap()));
+                return result;
+            });
     }
 
     QFuture<QList<QUrl>> RemoteTorrent::fetchURLSeeds() const
